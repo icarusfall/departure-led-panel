@@ -1,0 +1,14 @@
+{
+  "name": "departure-board-proxy",
+  "version": "1.0.0",
+  "description": "Turns National Rail Darwin departure boards into compact JSON for the LED departure board",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "generatedAt": "2026-11-09T22:30:00.0000000+00:00",
+  "locationName": "Streatham Common",
+  "crs": "SRC",
+  "platformAvailable": true,
+  "trainServices": [
+    {
+      "std": "22:34",
+      "etd": "On time",
+      "platform": "2",
+      "operator": "Southern",
+      "operatorCode": "SN",
+      "isCancelled": false,
+      "destination": [{ "locationName": "London Victoria", "crs": "VIC" }],
+      "subsequentCallingPoints": [
+        {
+          "callingPoint": [
+            { "locationName": "Balham", "crs": "BAL", "st": "22:38", "et": "On time" },
+            { "locationName": "Wandsworth Common", "crs": "WSW", "st": "22:40", "et": "On time" },
+            { "locationName": "Clapham Junction", "crs": "CLJ", "st": "22:43", "et": "On time" },
+            { "locationName": "London Victoria", "crs": "VIC", "st": "22:50", "et": "On time" }
+          ]
+        }
+      ]
+    },
+    {
+      "std": "22:37",
+      "etd": "22:41",
+      "platform": "1",
+      "operator": "Southern",
+      "operatorCode": "SN",
+      "destination": [{ "locationName": "East Croydon", "crs": "ECR" }],
+      "subsequentCallingPoints": [
+        {
+          "callingPoint": [
+            { "locationName": "Norbury", "crs": "NRB", "st": "22:40", "et": "22:44" },
+            { "locationName": "Thornton Heath", "crs": "TTH", "st": "22:43", "et": "22:47" },
+            { "locationName": "East Croydon", "crs": "ECR", "st": "22:48", "et": "22:52" }
+          ]
+        }
+      ]
+    },
+    {
+      "std": "22:45",
+      "etd": "Cancelled",
+      "isCancelled": true,
+      "platform": "3",
+      "operator": "Thameslink",
+      "operatorCode": "TL",
+      "destination": [{ "locationName": "London Blackfriars", "crs": "BFR" }],
+      "subsequentCallingPoints": [
+        {
+          "callingPoint": [
+            { "locationName": "Streatham", "crs": "STE", "st": "22:48", "et": "Cancelled" },
+            { "locationName": "Tulse Hill", "crs": "TUH", "st": "22:51", "et": "Cancelled" },
+            { "locationName": "London Blackfriars", "crs": "BFR", "st": "23:05", "et": "Cancelled" }
+          ]
+        }
+      ]
+    },
+    {
+      "std": "22:52",
+      "etd": "On time",
+      "operator": "Southern",
+      "operatorCode": "SN",
+      "destination": [{ "locationName": "Epsom", "crs": "EPS" }],
+      "subsequentCallingPoints": [
+        {
+          "callingPoint": [
+            { "locationName": "Mitcham Eastfields", "crs": "MTC", "st": "22:56", "et": "On time" },
+            { "locationName": "Epsom", "crs": "EPS", "st": "23:20", "et": "On time" }
+          ]
+        }
+      ]
+    }
+  ]
+}
