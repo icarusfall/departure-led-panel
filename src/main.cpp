@@ -11,6 +11,9 @@
 #ifndef MAX_BRIGHTNESS
 #define MAX_BRIGHTNESS 60
 #endif
+#ifndef DISPLAY_ROTATION
+#define DISPLAY_ROTATION 0  // 0 or 2 only; 1/3 would swap width and height
+#endif
 
 constexpr int PANEL_W = 64;
 constexpr int PANEL_H = 32;
@@ -84,6 +87,7 @@ void setup() {
   }
 
   AMBER = dim(255, 140, 0);
+  matrix.setRotation(DISPLAY_ROTATION);
   matrix.setTextWrap(false);
   matrix.setTextSize(1);
   testPattern();
