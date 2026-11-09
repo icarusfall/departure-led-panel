@@ -1,0 +1,6 @@
+# PlatformIO build output and caches
+.pio/
+.vscode/
+# Local secrets (Wi-Fi, API keys) must never be committed
+secrets.h
+*.env
