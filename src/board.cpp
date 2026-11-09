@@ -52,28 +52,45 @@ static void drawRow(Adafruit_GFX &g, int row, const Departure &d,
   dotfont::drawText(g, destL - offset, y, d.destination, color, destL, destR);
 }
 
+int renderMessageRow(Adafruit_GFX &g, const BoardOptions &opt,
+                     uint32_t nowMs) {
+  const int totalRows = g.height() / ROW_H;
+  if (!(opt.showMessage && opt.message && *opt.message)) return totalRows;
+  // Scroll in from the right edge until fully gone, then repeat.
+  const int width = g.width();
+  const int span = width + dotfont::textWidth(opt.message);
+  const int x = width - (int)((nowMs / MSG_MS_PER_PX) % span);
+  dotfont::drawText(g, x, (totalRows - 1) * ROW_H, opt.message, opt.color, 0,
+                    width);
+  return totalRows - 1;
+}
+
 void renderBoard(Adafruit_GFX &g, const Departure *deps, int count,
                  const BoardOptions &opt, uint32_t nowMs) {
   g.fillScreen(0);
-  const int width = g.width();
-  const int totalRows = g.height() / ROW_H;
-  const bool message = opt.showMessage && opt.message && *opt.message;
-  const int depRows = message ? totalRows - 1 : totalRows;
+  const int depRows = renderMessageRow(g, opt, nowMs);
 
   if (count == 0) {
     const char *txt = "No departures";
-    dotfont::drawText(g, (width - dotfont::textWidth(txt)) / 2, ROW_H,
+    dotfont::drawText(g, (g.width() - dotfont::textWidth(txt)) / 2, ROW_H,
                       txt, opt.color);
   }
   for (int i = 0; i < depRows && i < count; i++) {
     drawRow(g, i, deps[i], opt.color, nowMs);
   }
+}
 
-  if (message) {
-    // Scroll in from the right edge until fully gone, then repeat.
-    const int msgW = dotfont::textWidth(opt.message);
-    const int span = width + msgW;
-    const int x = width - (int)((nowMs / MSG_MS_PER_PX) % span);
-    dotfont::drawText(g, x, depRows * ROW_H, opt.message, opt.color, 0, width);
+void renderBums(Adafruit_GFX &g, uint16_t color, uint32_t nowMs) {
+  static const char *WORD = "bums";
+  const int unit = dotfont::textWidth(WORD) + 6;  // word + spacing
+  const int width = g.width();
+  g.fillScreen(0);
+  for (int row = 0; row < g.height() / ROW_H; row++) {
+    const int msPerPx = 22 + row * 9;  // each row its own speed
+    int shift = (nowMs / msPerPx) % unit;
+    if (row % 2) shift = unit - 1 - shift;  // alternate directions
+    for (int x = -shift; x < width; x += unit) {
+      dotfont::drawText(g, x, row * ROW_H, WORD, color, 0, width);
+    }
   }
 }

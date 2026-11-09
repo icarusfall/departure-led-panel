@@ -12,9 +12,12 @@ static const uint8_t latchPin = 47;
 static const uint8_t oePin = 14;
 
 // 32-row, 1/16 scan panels use 4 address lines (A-D). Chained panels are
-// treated as one wide matrix. Bit depth 4, double-buffered for smooth scroll.
-Adafruit_Protomatter matrix(MATRIX_W, 4, 1, rgbPins, 4, addrPins, clockPin,
+// treated as one wide matrix. Bit depth 6 gives smooth low-brightness
+// steps; double-buffered for smooth scrolling.
+Adafruit_Protomatter matrix(MATRIX_W, 6, 1, rgbPins, 4, addrPins, clockPin,
                             latchPin, oePin, true);
+
+static uint8_t brightnessPct = 50;
 
 bool displayBegin() {
   ProtomatterStatus status = matrix.begin();
@@ -25,10 +28,34 @@ bool displayBegin() {
   return true;
 }
 
+void displaySetBrightness(uint8_t pct) {
+  brightnessPct = pct < 1 ? 1 : (pct > 100 ? 100 : pct);
+}
+
 uint16_t dimColor(uint8_t r, uint8_t g, uint8_t b) {
-  return matrix.color565((r * MAX_BRIGHTNESS) / 255,
-                         (g * MAX_BRIGHTNESS) / 255,
-                         (b * MAX_BRIGHTNESS) / 255);
+  const uint32_t level = (uint32_t)MAX_BRIGHTNESS * brightnessPct / 100;
+  return matrix.color565(r * level / 255, g * level / 255, b * level / 255);
+}
+
+uint16_t dimColor(uint32_t rgb) {
+  return dimColor((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
+}
+
+void displayLines(const char *a, const char *b, const char *c,
+                  uint16_t color) {
+  if (!color) color = dimColor(0xFF8C00);
+  const char *lines[] = {a, b, c};
+  int n = 0;
+  for (auto l : lines) if (l && *l) n++;
+  matrix.fillScreen(0);
+  int y = (MATRIX_H - n * 10) / 2 + 1;
+  for (auto l : lines) {
+    if (!l || !*l) continue;
+    dotfont::drawText(matrix, (matrix.width() - dotfont::textWidth(l)) / 2,
+                      y, l, color, 0, matrix.width());
+    y += 10;
+  }
+  matrix.show();
 }
 
 void displayTestPattern(uint16_t accent) {
@@ -42,7 +69,7 @@ void displayTestPattern(uint16_t accent) {
     matrix.fillScreen(s.c);
     dotfont::drawText(matrix, 2, 12, s.name, 0);
     matrix.show();
-    delay(600);
+    delay(400);
   }
   // Numbered box per panel, to check chain order left to right.
   matrix.fillScreen(0);
@@ -53,5 +80,5 @@ void displayTestPattern(uint16_t accent) {
     dotfont::drawText(matrix, p * PANEL_W + 30, 12, label, accent);
   }
   matrix.show();
-  delay(1200);
+  delay(1000);
 }

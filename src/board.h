@@ -19,3 +19,10 @@ struct BoardOptions {
 // derived from nowMs, so the caller just redraws every ~30 ms.
 void renderBoard(Adafruit_GFX &g, const Departure *deps, int count,
                  const BoardOptions &opt, uint32_t nowMs);
+
+// Draws the scrolling message on the bottom row if enabled. Returns the
+// number of rows left above it for other content.
+int renderMessageRow(Adafruit_GFX &g, const BoardOptions &opt, uint32_t nowMs);
+
+// Secret mode: rows of "bums" sliding in alternate directions.
+void renderBums(Adafruit_GFX &g, uint16_t color, uint32_t nowMs);
