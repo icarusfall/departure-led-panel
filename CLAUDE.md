@@ -20,8 +20,10 @@ I'm a confident hobbyist developer. I'll do the physical testing; tell me exactl
 - Cap brightness in firmware from the start. Three panels at full white could exceed the supply's rating, and full brightness is unbearable indoors anyway.
 
 ## Current state
-- A single panel lights up with the board on the correct input header.
-- No custom firmware has been written yet.
+- **Milestones 1–4 are done.** Three panels are chained (192×32) and running the departure-board layout with live TfL buses for Conyers Road (north and south). Wi-Fi setup portal, settings page at `http://departures.local`, six modes (including the secret one) and a night schedule all work.
+- **Hardware findings:** the Waveshare panels have green and blue swapped (fixed in the pin order in `src/display.cpp`). The panels are mounted upside down, so `DISPLAY_ROTATION=2`. Settings are in `platformio.ini`.
+- **Milestone 5 (trains):** decided to use a Railway proxy for trains only, with National Rail Darwin via the Rail Data Marketplace. Realtime Trains' free tier is too limited. The proxy is built in `proxy/` but not deployed yet, waiting on Rail Data Marketplace approval.
+- **Secrets:** the TfL key and stop IDs live only on the board (NVS). The rail key will live only in Railway variables.
 
 ## Toolchain
 - PlatformIO with the Arduino framework. Board: Adafruit MatrixPortal ESP32-S3.
