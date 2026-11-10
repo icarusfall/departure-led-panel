@@ -8,7 +8,7 @@ extern Adafruit_Protomatter matrix;
 // Starts the matrix. Returns false (and logs) on failure.
 bool displayBegin();
 
-// Sets the brightness (5-100, percent of the MAX_BRIGHTNESS hardware cap)
+// Sets the brightness (5-100, percent of the BOARD_MAX_BRIGHTNESS hardware cap)
 // used by the colour helpers below.
 void displaySetBrightness(uint8_t pct);
 

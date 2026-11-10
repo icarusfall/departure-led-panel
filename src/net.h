@@ -12,8 +12,8 @@ bool netBegin();
 
 bool netConnected();
 
-// Call every loop: retries Wi-Fi every 20 s while it's down, restarts mDNS
-// when it comes back, and restarts the board after 10 minutes offline
+// Call every loop: retries Wi-Fi every 20 s while it's down, and restarts
+// the board after 10 minutes offline
 // (which reopens the setup portal if the saved network is gone).
 void netLoop();
 

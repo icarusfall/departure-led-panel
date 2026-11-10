@@ -3,6 +3,7 @@
 // page, modes and night schedule.
 
 #include <Arduino.h>
+#include <Preferences.h>
 #include <WiFi.h>
 #include <esp_task_wdt.h>
 #include <string.h>
@@ -10,6 +11,7 @@
 #include "display.h"
 #include "dotfont.h"
 #include "feed.h"
+#include "matter_modes.h"
 #include "modes.h"
 #include "net.h"
 #include "ota.h"
@@ -39,16 +41,62 @@ static void heartbeat(uint32_t now) {
   last = now;
   char feed[64];
   feedStatusText(feed, sizeof(feed));
-  Serial.printf("[%lus] mode=%u wifi=%s rssi=%d heap=%uK min=%uK | %s\n",
+  Serial.printf("[%lus] mode=%u wifi=%s rssi=%d heap=%uK min=%uK matter=%s | %s\n",
                 (unsigned long)(now / 1000), settings.mode,
                 netConnected() ? "up" : "DOWN", WiFi.RSSI(),
                 (unsigned)(ESP.getFreeHeap() / 1024),
-                (unsigned)(ESP.getMinFreeHeap() / 1024), feed);
+                (unsigned)(ESP.getMinFreeHeap() / 1024),
+                matterModesCommissioned() ? "paired" : "unpaired", feed);
 }
 
 static uint32_t titleUntil = 0;
 
-static void onModeChange() { titleUntil = millis() + TITLE_MS; }
+static void logHeap(const char *stage) {
+  Serial.printf("[heap] %-14s free=%uK min=%uK largest=%uK psram=%uK\n", stage,
+                (unsigned)(ESP.getFreeHeap() / 1024),
+                (unsigned)(ESP.getMinFreeHeap() / 1024),
+                (unsigned)(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) / 1024),
+                (unsigned)(ESP.getFreePsram() / 1024));
+  Serial.flush();
+}
+
+// Starts Matter unless the previous attempt crashed the board. A flag is
+// set in NVS before starting and cleared once it's up, so a crash during
+// startup leaves it set and the next boot runs without voice control
+// rather than crash-looping.
+static bool matterSafeBegin() {
+  Preferences p;
+  p.begin("boot", false);
+  const bool crashedLastTime = p.getBool("matterTry", false);
+  if (crashedLastTime) {
+    p.putBool("matterTry", false);  // try again on the boot after this one
+    p.end();
+    Serial.println("Matter skipped: it crashed on the previous boot");
+    return false;
+  }
+  p.putBool("matterTry", true);
+  p.end();
+  matterModesBegin(settings.mode);
+  p.begin("boot", false);
+  p.putBool("matterTry", false);
+  p.end();
+  return true;
+}
+
+// Called when the mode changes on the settings page, and at boot.
+static void onModeChange() {
+  titleUntil = millis() + TITLE_MS;
+  matterModesShow(settings.mode);  // keep Google Home in step
+}
+
+// Applies a mode chosen from Google Home.
+static void applyMatterRequest() {
+  const int m = matterModesTakeRequest();
+  if (m < 0 || m >= MODE_COUNT || m == settings.mode) return;
+  settings.mode = m;
+  settingsSave();
+  titleUntil = millis() + TITLE_MS;
+}
 
 // True when the night schedule says the board should be dimmed or off.
 static bool isNight() {
@@ -123,20 +171,32 @@ void setup() {
   Serial.begin(115200);
   delay(300);
   Serial.printf("Departure board: %d panel(s), %dx%d, brightness cap %d\n",
-                PANEL_COUNT, MATRIX_W, MATRIX_H, MAX_BRIGHTNESS);
+                PANEL_COUNT, MATRIX_W, MATRIX_H, BOARD_MAX_BRIGHTNESS);
   Serial.printf("Last restart: %s. Firmware " __DATE__ " " __TIME__ "\n",
                 resetReasonText());
 
   settingsLoad();
   displaySetBrightness(settings.brightness);
+  // Send ordinary allocations over 64 bytes to PSRAM (2MB, mostly unused)
+  // instead of the default 4KB threshold. That leaves internal RAM for what
+  // must live there: display DMA buffers, TLS (forced internal in this
+  // build) and Matter's startup.
+  heap_caps_malloc_extmem_enable(64);
+  logHeap("boot");
   if (!displayBegin()) {
     for (;;) delay(1000);
   }
   displayTestPattern(dimColor(settings.color));
 
+  logHeap("after display");
   netBegin();  // may block in the setup portal, so before the watchdog
   webBegin(onModeChange);
   otaBegin(settings.otaPassword);
+  // Matter starts before the first data fetch so their memory peaks
+  // (Matter startup, TLS handshakes) don't overlap.
+  logHeap("before Matter");
+  matterSafeBegin();
+  logHeap("after Matter");
   watchdogBegin();
   feedBegin();
   onModeChange();  // show the current mode's name on boot
@@ -147,6 +207,8 @@ void loop() {
   netLoop();
   otaLoop();
   webLoop();
+  matterModesLoop();
+  applyMatterRequest();
   heartbeat(millis());
 
   static uint32_t lastFrame = 0;

@@ -2,6 +2,7 @@
 #include <WebServer.h>
 #include <WiFi.h>
 #include "feed.h"
+#include "matter_modes.h"
 #include "modes.h"
 #include "settings.h"
 #include "status.h"
@@ -167,6 +168,24 @@ static void handleRoot() {
   h += F("'><p class=hint>Takes effect after a restart.</p>"
          "<button class=save>Save settings</button></form>");
 
+  h += F("<h2>Google Home (Matter)</h2>");
+  if (matterModesCommissioned()) {
+    h += F("<p>Paired. Each mode is a switch in Google Home.</p>"
+           "<form method=post action=/matter/unpair "
+           "onsubmit=\"return confirm('Remove the board from Google Home?')\">"
+           "<button class=save style='background:#444;color:#eee'>Unpair"
+           "</button></form>");
+  } else {
+    h += F("<p>Not paired. In Google Home: + &rsaquo; Device &rsaquo; New "
+           "device &rsaquo; Matter-enabled device. Keep Bluetooth on.</p>"
+           "<p>Pairing code: <b>");
+    h += matterModesPairingCode();
+    h += F("</b> &middot; <a style='color:#ffb347' href='");
+    h += matterModesQrUrl();
+    h += F("'>QR code</a></p><p class=hint>Pairing is open for 15 minutes "
+           "after the board starts; press RESET to reopen it.</p>");
+  }
+
   appendStatus(h);
   h += F("</body></html>");
 
@@ -216,9 +235,17 @@ static void handleSave() {
   redirectHome();
 }
 
+static void handleUnpair() {
+  server.sendHeader("Location", "/");
+  server.send(303);
+  delay(200);
+  matterModesUnpair();
+}
+
 void webBegin(void (*onModeChange)()) {
   modeChanged = onModeChange;
   server.on("/", HTTP_GET, handleRoot);
+  server.on("/matter/unpair", HTTP_POST, handleUnpair);
   server.on("/mode", HTTP_POST, handleMode);
   server.on("/save", HTTP_POST, handleSave);
   server.onNotFound([] { server.send(404, "text/plain", "Not found"); });

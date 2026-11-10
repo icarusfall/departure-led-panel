@@ -12,10 +12,12 @@ static const uint8_t latchPin = 47;
 static const uint8_t oePin = 14;
 
 // 32-row, 1/16 scan panels use 4 address lines (A-D). Chained panels are
-// treated as one wide matrix. Bit depth 6 gives smooth low-brightness
-// steps; double-buffered for smooth scrolling.
-Adafruit_Protomatter matrix(MATRIX_W, 6, 1, rgbPins, 4, addrPins, clockPin,
-                            latchPin, oePin, true);
+// treated as one wide matrix. The bitplane buffers must sit in internal
+// DMA RAM, which Matter and TLS also need, so each bit of depth costs ~6KB
+// and double-buffering doubles it. BOARD_DOUBLE_BUFFER trades that RAM for
+// tear-free scrolling.
+Adafruit_Protomatter matrix(MATRIX_W, BOARD_BIT_DEPTH, 1, rgbPins, 4, addrPins,
+                            clockPin, latchPin, oePin, BOARD_DOUBLE_BUFFER);
 
 static uint8_t brightnessPct = 50;
 
@@ -33,7 +35,7 @@ void displaySetBrightness(uint8_t pct) {
 }
 
 uint16_t dimColor(uint8_t r, uint8_t g, uint8_t b) {
-  const uint32_t level = (uint32_t)MAX_BRIGHTNESS * brightnessPct / 100;
+  const uint32_t level = (uint32_t)BOARD_MAX_BRIGHTNESS * brightnessPct / 100;
   return matrix.color565(r * level / 255, g * level / 255, b * level / 255);
 }
 

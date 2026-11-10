@@ -157,6 +157,11 @@ static void taskFn(void *) {
   static Result fresh;  // static: too big for comfort on the task stack
   static FeedRequest q;
   esp_task_wdt_add(nullptr);  // restart the board if this task hangs
+  // Let Matter's startup memory spike pass before the first TLS handshake.
+  for (int i = 0; i < 3; i++) {
+    esp_task_wdt_reset();
+    vTaskDelay(pdMS_TO_TICKS(5000));
+  }
   for (;;) {
     esp_task_wdt_reset();
     xSemaphoreTake(lock, portMAX_DELAY);
@@ -208,7 +213,12 @@ void feedStatusText(char *buf, size_t len) {
 
 void feedBegin() {
   lock = xSemaphoreCreateMutex();
-  xTaskCreatePinnedToCore(taskFn, "feed", 12288, nullptr, 1, &task, 0);
+  // Stack in PSRAM: internal RAM is reserved for TLS, Matter and display DMA.
+  if (xTaskCreatePinnedToCoreWithCaps(taskFn, "feed", 12288, nullptr, 1, &task,
+                                      0, MALLOC_CAP_SPIRAM) != pdPASS) {
+    Serial.println("Feed task in PSRAM failed; using internal RAM");
+    xTaskCreatePinnedToCore(taskFn, "feed", 12288, nullptr, 1, &task, 0);
+  }
 }
 
 void feedSet(const FeedRequest &r) {

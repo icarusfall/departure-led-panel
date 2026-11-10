@@ -1,5 +1,7 @@
 #include "net.h"
 #include <ESPmDNS.h>
+#include <mdns.h>
+#include <string.h>
 #include <WiFi.h>
 #include <WiFiManager.h>
 #include <time.h>
@@ -56,18 +58,53 @@ bool netConnected() { return WiFi.status() == WL_CONNECTED; }
 
 static const uint32_t RETRY_MS = 20000;
 static const uint32_t GIVE_UP_MS = 10 * 60000;
+static const uint32_t NAME_CHECK_MS = 10000;
+
+// Matter shares the mDNS service and replaces our hostname with its own
+// (MAC-based) one. Rather than fight it, publish departures.local as an
+// extra delegated name pointing at our IP, with the settings page service.
+static void keepNameAdvertised() {
+  static uint32_t lastCheck = 0, lastIp = 0;
+  static bool delegated = false;
+  if (millis() - lastCheck < NAME_CHECK_MS || WiFi.status() != WL_CONNECTED)
+    return;
+  lastCheck = millis();
+
+  char primary[64] = "";
+  mdns_hostname_get(primary);
+  const uint32_t ip = (uint32_t)WiFi.localIP();
+  if (!delegated && strcmp(primary, HOSTNAME) == 0) return;  // still ours
+
+  mdns_ip_addr_t addr = {};
+  addr.addr.type = ESP_IPADDR_TYPE_V4;
+  addr.addr.u_addr.ip4.addr = ip;
+  if (!delegated) {
+    if (mdns_delegate_hostname_add(HOSTNAME, &addr) == ESP_OK) {
+      mdns_service_add_for_host(nullptr, "_http", "_tcp", HOSTNAME, 80,
+                                nullptr, 0);
+      delegated = true;
+      Serial.printf("mDNS: primary name is now '%s'; added %s.local\n",
+                    primary, HOSTNAME);
+    }
+  } else if (ip != lastIp) {
+    mdns_delegate_hostname_set_address(HOSTNAME, &addr);
+    Serial.println("mDNS: updated departures.local address");
+  }
+  lastIp = ip;
+}
 
 void netLoop() {
+  keepNameAdvertised();
   static bool wasUp = true;  // netBegin's result is reported separately
   static uint32_t downSince = 0, lastTry = 0;
   const uint32_t now = millis();
 
   if (WiFi.status() == WL_CONNECTED) {
     if (!wasUp) {
+      // mDNS re-announces by itself. Don't restart it: Matter shares the
+      // same mDNS service and would lose its adverts.
       Serial.printf("Wi-Fi back after %lu s\n",
                     (unsigned long)((now - downSince) / 1000));
-      MDNS.end();
-      if (MDNS.begin(HOSTNAME)) MDNS.addService("http", "tcp", 80);
     }
     wasUp = true;
     return;
