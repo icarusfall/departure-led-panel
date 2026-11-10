@@ -30,6 +30,29 @@ test('cancelled trains are flagged', () => {
   assert.equal(out.services[1].status, 'Canc');
 });
 
+test('West London Line trains via Clapham Junction count as north', () => {
+  const watford = {
+    std: '21:25', etd: 'On time',
+    destination: [{ locationName: 'Watford Junction', crs: 'WFJ' }],
+    subsequentCallingPoints: [{ callingPoint: [
+      { locationName: 'Balham', crs: 'BAL' },
+      { locationName: 'Clapham Junction', crs: 'CLJ' },
+      { locationName: 'Imperial Wharf', crs: 'IMW' },
+    ] }],
+  };
+  const out = shapeBoard({ trainServices: [watford] }, { dir: 'north', nowMinutes: now });
+  assert.equal(out.services.length, 1);
+});
+
+test('"(London)" is dropped from destination names', () => {
+  const sutton = {
+    std: '22:44', etd: 'On time',
+    destination: [{ locationName: 'Sutton (London)', crs: 'SUO' }],
+  };
+  const out = shapeBoard({ trainServices: [sutton] }, { dir: 'south', nowMinutes: now });
+  assert.equal(out.services[0].dest, 'Sutton');
+});
+
 test('minutes wrap past midnight', () => {
   assert.equal(minutesUntil('00:05', 23 * 60 + 55), 10);
   assert.equal(minutesUntil('23:55', 5), -10);

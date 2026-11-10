@@ -1,9 +1,9 @@
 #include "board.h"
 #include <stdio.h>
+#include <string.h>
 #include "dotfont.h"
 
 static const int ROW_H = 8;          // 7px glyphs + descender row; 4 rows = 32px
-static const int ROUTE_W = 23;       // fits four tabular characters, e.g. "N133"
 static const int COL_GAP = 3;
 static const int MSG_MS_PER_PX = 30;  // message scroll speed (~33 px/s)
 
@@ -20,22 +20,26 @@ static void formatMinutes(int minutes, char *buf, size_t len) {
 }
 
 static void drawRow(Adafruit_GFX &g, int row, const Departure &d,
-                    uint16_t color, uint32_t nowMs) {
+                    const BoardOptions &opt, uint32_t nowMs) {
   const int y = row * ROW_H;
   const int width = g.width();
+  const uint16_t color = opt.color;
 
-  dotfont::drawText(g, 0, y, d.route, color, 0, ROUTE_W);
+  dotfont::drawText(g, 0, y, d.route, color, 0, opt.routeWidth);
 
   // Minutes, right-aligned. The column is sized for the widest likely value
   // so the destination column doesn't jump around as times change.
   static int minColW = -1;
   if (minColW < 0) minColW = dotfont::textWidth("88 min");
   char mins[12];
-  formatMinutes(d.minutes, mins, sizeof(mins));
+  if (d.status[0])
+    strlcpy(mins, d.status, sizeof(mins));
+  else
+    formatMinutes(d.minutes, mins, sizeof(mins));
   dotfont::drawText(g, width - dotfont::textWidth(mins), y, mins, color);
 
   // Destination, clipped to its column; slides if it doesn't fit.
-  const int destL = ROUTE_W + COL_GAP;
+  const int destL = opt.routeWidth + COL_GAP;
   const int destR = width - minColW - COL_GAP;
   const int overflow = dotfont::textWidth(d.destination) - (destR - destL);
   int offset = 0;
@@ -76,7 +80,7 @@ void renderBoard(Adafruit_GFX &g, const Departure *deps, int count,
                       txt, opt.color);
   }
   for (int i = 0; i < depRows && i < count; i++) {
-    drawRow(g, i, deps[i], opt.color, nowMs);
+    drawRow(g, i, deps[i], opt, nowMs);
   }
 }
 

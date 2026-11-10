@@ -4,13 +4,20 @@
 #include <Adafruit_GFX.h>
 
 struct Departure {
-  char route[6];         // e.g. "250", "N133"
+  char route[6];         // bus route ("250", "N133") or train time ("20:36")
   char destination[40];  // e.g. "Croydon Town Centre"
   int minutes;           // 0 shows as "Due"
+  char status[8];        // if set, shown instead of minutes ("Canc", "Delay")
 };
+
+// First-column widths: four tabular characters for routes like "N133",
+// and "20:36" for train departure times.
+constexpr int ROUTE_COL_BUS = 23;
+constexpr int ROUTE_COL_TRAIN = 26;
 
 struct BoardOptions {
   uint16_t color;
+  int routeWidth = ROUTE_COL_BUS;
   bool showMessage;     // true: 3 departure rows + message; false: 4 rows
   const char *message;  // scrolled along the bottom row when shown
 };

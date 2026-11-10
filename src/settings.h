@@ -17,6 +17,8 @@ struct Settings {
   char busStopNorth[16];    // TfL NaPTAN IDs, e.g. 490012345N
   char busStopSouth[16];
   char tflKey[64];
+  char proxyUrl[96];        // train proxy base URL (Railway)
+  char proxyToken[64];      // shared secret sent as X-Board-Token
 };
 
 extern Settings settings;

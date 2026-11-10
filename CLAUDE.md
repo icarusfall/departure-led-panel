@@ -22,8 +22,8 @@ I'm a confident hobbyist developer. I'll do the physical testing; tell me exactl
 ## Current state
 - **Milestones 1–4 are done.** Three panels are chained (192×32) and running the departure-board layout with live TfL buses for Conyers Road (north and south). Wi-Fi setup portal, settings page at `http://departures.local`, six modes (including the secret one) and a night schedule all work.
 - **Hardware findings:** the Waveshare panels have green and blue swapped (fixed in the pin order in `src/display.cpp`). The panels are mounted upside down, so `DISPLAY_ROTATION=2`. Settings are in `platformio.ini`.
-- **Milestone 5 (trains):** decided to use a Railway proxy for trains only, with National Rail Darwin via the Rail Data Marketplace. Realtime Trains' free tier is too limited. The proxy is built in `proxy/` but not deployed yet, waiting on Rail Data Marketplace approval.
-- **Secrets:** the TfL key and stop IDs live only on the board (NVS). The rail key will live only in Railway variables.
+- **Milestone 5 (trains) is done.** Trains come through a Railway proxy (`proxy/`, Railway project `departure-board-proxy` in the personal workspace, at `https://train-proxy-production.up.railway.app`), using National Rail Darwin via the Rail Data Marketplace. Buses still come direct from TfL. Northbound means calling at central London, Balham or Clapham Junction within 8 stops. Railway chunks responses, so the proxy sets Content-Length and the board reads proxy replies whole.
+- **Secrets:** the TfL key, stop IDs and proxy token live only on the board (NVS). `RDM_KEY` and `PROXY_TOKEN` live only in Railway variables.
 
 ## Toolchain
 - PlatformIO with the Arduino framework. Board: Adafruit MatrixPortal ESP32-S3.

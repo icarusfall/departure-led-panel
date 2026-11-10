@@ -43,9 +43,15 @@ async function fetchBoard(crs) {
   return board;
 }
 
+// An explicit Content-Length avoids chunked responses, which the board's
+// streaming JSON parser can't read.
 function send(res, status, body) {
-  res.writeHead(status, { 'content-type': 'application/json' });
-  res.end(JSON.stringify(body));
+  const json = Buffer.from(JSON.stringify(body));
+  res.writeHead(status, {
+    'content-type': 'application/json',
+    'content-length': json.length,
+  });
+  res.end(json);
 }
 
 const server = http.createServer(async (req, res) => {

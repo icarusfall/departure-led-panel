@@ -120,7 +120,16 @@ static void handleRoot() {
   h += F("'><label>TfL app key</label><input type=password name=tflKey "
          "autocomplete=off placeholder='");
   h += s.tflKey[0] ? F("Saved - leave blank to keep") : F("Not set");
-  h += F("'><p class=hint>The key is stored on the board only.</p>"
+  h += F("'><p class=hint>The key is stored on the board only.</p>");
+
+  h += F("<h2>Trains (proxy)</h2><label>Proxy URL</label>"
+         "<input type=text name=proxyUrl maxlength=95 value='");
+  h += esc(s.proxyUrl);
+  h += F("'><label>Proxy token</label><input type=password name=proxyTok "
+         "autocomplete=off placeholder='");
+  h += s.proxyToken[0] ? F("Saved - leave blank to keep") : F("Not set");
+  h += F("'><p class=hint>PROXY_TOKEN from the Railway service's "
+         "Variables tab.</p>"
          "<button class=save>Save settings</button></form></body></html>");
 
   server.send(200, "text/html; charset=utf-8", h);
@@ -157,6 +166,12 @@ static void handleSave() {
   server.arg("stopS").toCharArray(s.busStopSouth, sizeof(s.busStopSouth));
   const String key = server.arg("tflKey");
   if (key.length()) key.toCharArray(s.tflKey, sizeof(s.tflKey));
+  String proxyUrl = server.arg("proxyUrl");
+  proxyUrl.trim();
+  proxyUrl.toCharArray(s.proxyUrl, sizeof(s.proxyUrl));
+  String tok = server.arg("proxyTok");
+  tok.trim();
+  if (tok.length()) tok.toCharArray(s.proxyToken, sizeof(s.proxyToken));
   settingsSave();
   redirectHome();
 }

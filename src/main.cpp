@@ -1,11 +1,13 @@
 // Home Departure Board
-// Live TfL bus departures, settings page, modes and night schedule.
+// Live buses (TfL) and trains (Darwin via our Railway proxy), settings
+// page, modes and night schedule.
 
 #include <Arduino.h>
+#include <string.h>
 #include "board.h"
-#include "bus_feed.h"
 #include "display.h"
 #include "dotfont.h"
+#include "feed.h"
 #include "modes.h"
 #include "net.h"
 #include "settings.h"
@@ -28,15 +30,6 @@ static bool isNight() {
   return a < b ? (now >= a && now < b) : (now >= a || now < b);
 }
 
-static void renderTrainPlaceholder(const BoardOptions &opt, uint32_t now) {
-  const ModeInfo &m = MODES[settings.mode];
-  matrix.fillScreen(0);
-  renderMessageRow(matrix, opt, now);
-  dotfont::drawText(matrix, 0, 0, m.place, opt.color);
-  dotfont::drawText(matrix, 0, 8, m.dir, opt.color);
-  dotfont::drawText(matrix, 0, 16, "Train times coming soon", opt.color);
-}
-
 // Up to two lines of status text above the message row.
 static void renderNotice(const BoardOptions &opt, uint32_t now,
                          const char *a, const char *b = nullptr) {
@@ -46,35 +39,54 @@ static void renderNotice(const BoardOptions &opt, uint32_t now,
   if (b && *b) dotfont::drawText(matrix, 0, 8, b, opt.color, 0, matrix.width());
 }
 
-static void renderBuses(const BoardOptions &opt, uint32_t now) {
-  static Departure deps[BUS_MAX];
+// What the feed should poll for the active mode.
+static FeedRequest requestForMode(uint8_t mode) {
+  FeedRequest r;
+  const char *stop = nullptr, *crs = nullptr, *dir = nullptr;
+  switch (mode) {
+    case MODE_BUS_NORTH: stop = settings.busStopNorth; break;
+    case MODE_BUS_SOUTH: stop = settings.busStopSouth; break;
+    case MODE_STREATHAM_NORTH: crs = "STE"; dir = "north"; break;
+    case MODE_STC_NORTH: crs = "SRC"; dir = "north"; break;
+    case MODE_STC_SOUTH: crs = "SRC"; dir = "south"; break;
+    default: break;  // bums: nothing to fetch
+  }
+  if (stop) {
+    r.kind = FEED_BUS;
+    strlcpy(r.where, stop, sizeof(r.where));
+    strlcpy(r.secret, settings.tflKey, sizeof(r.secret));
+  } else if (crs) {
+    r.kind = FEED_TRAIN;
+    strlcpy(r.where, crs, sizeof(r.where));
+    strlcpy(r.dir, dir, sizeof(r.dir));
+    strlcpy(r.secret, settings.proxyToken, sizeof(r.secret));
+    strlcpy(r.base, settings.proxyUrl, sizeof(r.base));
+  }
+  return r;
+}
+
+static void renderDepartures(BoardOptions &opt, uint32_t now) {
+  static Departure deps[FEED_MAX];
+  const bool train = modeIsTrain(settings.mode);
   int count;
   char err[48];
-  switch (busFeedSnapshot(deps, count, err, sizeof(err))) {
-    case BUS_NOT_CONFIGURED:
-      renderNotice(opt, now, "Set bus stop and TfL key",
+  switch (feedSnapshot(deps, count, err, sizeof(err))) {
+    case FEED_NOT_CONFIGURED:
+      renderNotice(opt, now,
+                   train ? "Set train proxy token" : "Set bus stop and TfL key",
                    "on the settings page");
       break;
-    case BUS_LOADING:
+    case FEED_LOADING:
       renderNotice(opt, now, MODES[settings.mode].title, "Loading...");
       break;
-    case BUS_ERROR:
+    case FEED_ERROR:
       renderNotice(opt, now, "No live data", err);
       break;
-    case BUS_OK:
+    case FEED_OK:
+      opt.routeWidth = train ? ROUTE_COL_TRAIN : ROUTE_COL_BUS;
       renderBoard(matrix, deps, count, opt, now);
       break;
   }
-}
-
-// Points the bus feed at the active mode's stop (or pauses it).
-static void updateBusFeed() {
-  if (settings.mode == MODE_BUS_NORTH)
-    busFeedSetStop(settings.busStopNorth, settings.tflKey);
-  else if (settings.mode == MODE_BUS_SOUTH)
-    busFeedSetStop(settings.busStopSouth, settings.tflKey);
-  else
-    busFeedSetStop("", "");
 }
 
 void setup() {
@@ -92,7 +104,7 @@ void setup() {
 
   netBegin();
   webBegin(onModeChange);
-  busFeedBegin();
+  feedBegin();
   onModeChange();  // show the current mode's name on boot
 }
 
@@ -101,9 +113,10 @@ void loop() {
 
   static uint32_t lastFrame = 0;
   const uint32_t now = millis();
-  updateBusFeed();
   if (now - lastFrame < FRAME_MS) return;
   lastFrame = now;
+
+  feedSet(requestForMode(settings.mode));
 
   const bool night = isNight();
   if (night && settings.nightOff) {
@@ -123,12 +136,9 @@ void loop() {
     return;  // displayLines already called show()
   }
 
-  if (settings.mode == MODE_BUMS) {
+  if (settings.mode == MODE_BUMS)
     renderBums(matrix, opt.color, now);
-  } else if (modeIsTrain(settings.mode)) {
-    renderTrainPlaceholder(opt, now);
-  } else {
-    renderBuses(opt, now);
-  }
+  else
+    renderDepartures(opt, now);
   matrix.show();
 }

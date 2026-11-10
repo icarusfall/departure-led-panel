@@ -28,6 +28,10 @@ void settingsLoad() {
                                            sizeof(settings.busStopSouth));
   prefs.getString("tflKey", "").toCharArray(settings.tflKey,
                                             sizeof(settings.tflKey));
+  prefs.getString("proxyUrl", "https://train-proxy-production.up.railway.app")
+      .toCharArray(settings.proxyUrl, sizeof(settings.proxyUrl));
+  prefs.getString("proxyTok", "").toCharArray(settings.proxyToken,
+                                              sizeof(settings.proxyToken));
   prefs.end();
 }
 
@@ -48,5 +52,7 @@ void settingsSave() {
   prefs.putString("stopN", settings.busStopNorth);
   prefs.putString("stopS", settings.busStopSouth);
   prefs.putString("tflKey", settings.tflKey);
+  prefs.putString("proxyUrl", settings.proxyUrl);
+  prefs.putString("proxyTok", settings.proxyToken);
   prefs.end();
 }

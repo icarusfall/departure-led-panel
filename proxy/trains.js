@@ -14,6 +14,10 @@ export const CENTRAL_LONDON = new Set([
   'CHX', // Charing Cross
   'CST', // Cannon Street
   'WAE', // Waterloo East
+  // Not central London, but only northbound trains from Streatham Common
+  // call here, e.g. Southern's West London Line services to Watford Junction.
+  'BAL', // Balham
+  'CLJ', // Clapham Junction
 ]);
 
 // How many upcoming stops to look at when deciding direction. Keeps loop
@@ -73,7 +77,9 @@ export function shapeBoard(board, { dir = 'all', nowMinutes, max = 8 } = {}) {
       return {
         std: s.std,
         etd: s.etd,
-        dest: asArray(s.destination).map((d) => d.locationName).join(' & '),
+        dest: asArray(s.destination)
+          .map((d) => d.locationName.replace(/ \(London\)$/, ''))
+          .join(' & '),
         plat: s.platform || null,
         mins: mins === null ? null : Math.max(0, mins),
         status: statusFor(s),
