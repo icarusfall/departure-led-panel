@@ -54,6 +54,42 @@ bool netBegin() {
 
 bool netConnected() { return WiFi.status() == WL_CONNECTED; }
 
+static const uint32_t RETRY_MS = 20000;
+static const uint32_t GIVE_UP_MS = 10 * 60000;
+
+void netLoop() {
+  static bool wasUp = true;  // netBegin's result is reported separately
+  static uint32_t downSince = 0, lastTry = 0;
+  const uint32_t now = millis();
+
+  if (WiFi.status() == WL_CONNECTED) {
+    if (!wasUp) {
+      Serial.printf("Wi-Fi back after %lu s\n",
+                    (unsigned long)((now - downSince) / 1000));
+      MDNS.end();
+      if (MDNS.begin(HOSTNAME)) MDNS.addService("http", "tcp", 80);
+    }
+    wasUp = true;
+    return;
+  }
+
+  if (wasUp) {
+    Serial.println("Wi-Fi lost");
+    wasUp = false;
+    downSince = lastTry = now;
+  }
+  if (now - lastTry > RETRY_MS) {
+    lastTry = now;
+    Serial.println("Wi-Fi: retrying");
+    WiFi.reconnect();
+  }
+  if (now - downSince > GIVE_UP_MS) {
+    Serial.println("Wi-Fi down for 10 min; restarting");
+    delay(100);
+    ESP.restart();
+  }
+}
+
 bool netLocalMinutes(int &minutes) {
   time_t now = time(nullptr);
   if (now < 1700000000) return false;  // not synced yet

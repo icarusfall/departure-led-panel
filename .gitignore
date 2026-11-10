@@ -4,3 +4,4 @@
 # Local secrets (Wi-Fi, API keys) must never be committed
 secrets.h
 *.env
+secrets.ini

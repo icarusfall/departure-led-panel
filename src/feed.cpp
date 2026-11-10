@@ -4,6 +4,7 @@
 #include <HTTPClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+#include <esp_task_wdt.h>
 
 static const uint32_t POLL_MS = 30000;       // TfL and Darwin refresh ~30s
 static const uint32_t STALE_MS = 5 * 60000;  // then show "No live data"
@@ -61,9 +62,10 @@ static void insertSorted(Result &r, const char *route, const char *dest,
 static bool getJson(const String &url, const char *headerName,
                     const char *headerValue, JsonDocument &filter,
                     JsonDocument &doc, Result &r, bool buffered = false) {
-  // TODO(milestone 6): verify server certificates instead of skipping checks.
+  // Verify servers against the framework's bundle of trusted root CAs.
   WiFiClientSecure client;
-  client.setInsecure();
+  client.useBuiltinCACertBundle();
+  client.setHandshakeTimeout(15);  // seconds; the default is 120
   HTTPClient http;
   http.useHTTP10(!buffered);  // asks for no chunking, so the JSON can stream
   http.setTimeout(10000);
@@ -154,7 +156,9 @@ static bool fetch(const FeedRequest &q, Result &r) {
 static void taskFn(void *) {
   static Result fresh;  // static: too big for comfort on the task stack
   static FeedRequest q;
+  esp_task_wdt_add(nullptr);  // restart the board if this task hangs
   for (;;) {
+    esp_task_wdt_reset();
     xSemaphoreTake(lock, portMAX_DELAY);
     q = req;
     xSemaphoreGive(lock);
@@ -179,8 +183,27 @@ static void taskFn(void *) {
       xSemaphoreGive(lock);
     }
     // Sleep until the next poll, or wake early when the request changes.
-    ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(POLL_MS));
+    // Waits in slices so the watchdog keeps being fed.
+    for (uint32_t waited = 0; waited < POLL_MS; waited += 5000) {
+      esp_task_wdt_reset();
+      if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(5000))) break;
+    }
   }
+}
+
+void feedStatusText(char *buf, size_t len) {
+  xSemaphoreTake(lock, portMAX_DELAY);
+  if (!isConfigured(req)) {
+    snprintf(buf, len, "%s", req.kind == FEED_NONE ? "Idle" : "Not configured");
+  } else if (res.error[0]) {
+    snprintf(buf, len, "%s: %s", req.where, res.error);
+  } else if (res.haveData) {
+    snprintf(buf, len, "%s: ok, %lu s ago", req.where,
+             (unsigned long)((millis() - res.fetchedAt) / 1000));
+  } else {
+    snprintf(buf, len, "%s: loading", req.where);
+  }
+  xSemaphoreGive(lock);
 }
 
 void feedBegin() {

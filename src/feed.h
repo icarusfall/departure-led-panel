@@ -31,6 +31,9 @@ void feedBegin();
 // fetch, and FEED_NONE pauses polling.
 void feedSet(const FeedRequest &req);
 
+// One-line summary for the status page, e.g. "SRC: ok, 12 s ago".
+void feedStatusText(char *buf, size_t len);
+
 // Copies current departures (minutes counted down since the last fetch)
 // into out[FEED_MAX]. err receives a short reason on FEED_ERROR.
 FeedStatus feedSnapshot(Departure *out, int &count, char *err, size_t errLen);

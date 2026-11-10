@@ -3,6 +3,8 @@
 // page, modes and night schedule.
 
 #include <Arduino.h>
+#include <WiFi.h>
+#include <esp_task_wdt.h>
 #include <string.h>
 #include "board.h"
 #include "display.h"
@@ -10,11 +12,39 @@
 #include "feed.h"
 #include "modes.h"
 #include "net.h"
+#include "ota.h"
 #include "settings.h"
+#include "status.h"
 #include "web.h"
 
 static const uint32_t FRAME_MS = 25;
-static const uint32_t TITLE_MS = 2500;  // mode name shown after a change
+static const uint32_t TITLE_MS = 2500;      // mode name shown after a change
+static const uint32_t WATCHDOG_MS = 60000;  // restart if a task hangs this long
+static const uint32_t HEARTBEAT_MS = 60000; // status line in the serial log
+
+// Restarts the board if the main loop (or the feed task, which adds itself)
+// stops checking in for WATCHDOG_MS.
+static void watchdogBegin() {
+  esp_task_wdt_config_t cfg = {};
+  cfg.timeout_ms = WATCHDOG_MS;
+  cfg.idle_core_mask = 0;
+  cfg.trigger_panic = true;
+  if (esp_task_wdt_reconfigure(&cfg) != ESP_OK) esp_task_wdt_init(&cfg);
+  esp_task_wdt_add(nullptr);
+}
+
+static void heartbeat(uint32_t now) {
+  static uint32_t last = 0;
+  if (now - last < HEARTBEAT_MS) return;
+  last = now;
+  char feed[64];
+  feedStatusText(feed, sizeof(feed));
+  Serial.printf("[%lus] mode=%u wifi=%s rssi=%d heap=%uK min=%uK | %s\n",
+                (unsigned long)(now / 1000), settings.mode,
+                netConnected() ? "up" : "DOWN", WiFi.RSSI(),
+                (unsigned)(ESP.getFreeHeap() / 1024),
+                (unsigned)(ESP.getMinFreeHeap() / 1024), feed);
+}
 
 static uint32_t titleUntil = 0;
 
@@ -94,6 +124,8 @@ void setup() {
   delay(300);
   Serial.printf("Departure board: %d panel(s), %dx%d, brightness cap %d\n",
                 PANEL_COUNT, MATRIX_W, MATRIX_H, MAX_BRIGHTNESS);
+  Serial.printf("Last restart: %s. Firmware " __DATE__ " " __TIME__ "\n",
+                resetReasonText());
 
   settingsLoad();
   displaySetBrightness(settings.brightness);
@@ -102,14 +134,20 @@ void setup() {
   }
   displayTestPattern(dimColor(settings.color));
 
-  netBegin();
+  netBegin();  // may block in the setup portal, so before the watchdog
   webBegin(onModeChange);
+  otaBegin(settings.otaPassword);
+  watchdogBegin();
   feedBegin();
   onModeChange();  // show the current mode's name on boot
 }
 
 void loop() {
+  esp_task_wdt_reset();
+  netLoop();
+  otaLoop();
   webLoop();
+  heartbeat(millis());
 
   static uint32_t lastFrame = 0;
   const uint32_t now = millis();

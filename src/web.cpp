@@ -1,7 +1,10 @@
 #include "web.h"
 #include <WebServer.h>
+#include <WiFi.h>
+#include "feed.h"
 #include "modes.h"
 #include "settings.h"
+#include "status.h"
 
 static WebServer server(80);
 static void (*modeChanged)() = nullptr;
@@ -47,7 +50,33 @@ input[type=range]{width:100%}
 .row{display:flex;gap:10px}.row>div{flex:1}
 .save{margin-top:20px;padding:14px;width:100%;font-size:1.05em;background:#ff8c00;color:#111;border:0;border-radius:8px;font-weight:600}
 .ok{background:#264d26;padding:8px 12px;border-radius:6px}.hint{color:#999;font-size:.85em}
+.status td{padding:3px 12px 3px 0;color:#bbb}.status td:first-child{color:#888}
 )CSS";
+
+static void appendStatus(String &h) {
+  char feed[64];
+  feedStatusText(feed, sizeof(feed));
+  const uint32_t up = millis() / 1000;
+  char upTxt[32];
+  snprintf(upTxt, sizeof(upTxt), "%lud %02luh %02lum", (unsigned long)(up / 86400),
+           (unsigned long)(up / 3600 % 24), (unsigned long)(up / 60 % 60));
+  h += F("<h2>Status</h2><table class=status>");
+  auto row = [&h](const __FlashStringHelper *k, const String &v) {
+    h += F("<tr><td>");
+    h += k;
+    h += F("</td><td>");
+    h += v;
+    h += F("</td></tr>");
+  };
+  row(F("Uptime"), upTxt);
+  row(F("Last restart"), resetReasonText());
+  row(F("Wi-Fi signal"), String(WiFi.RSSI()) + " dBm");
+  row(F("Free memory"), String(ESP.getFreeHeap() / 1024) + " KB (low " +
+                            String(ESP.getMinFreeHeap() / 1024) + " KB)");
+  row(F("Live data"), esc(feed));
+  row(F("Firmware"), F(__DATE__ " " __TIME__));
+  h += F("</table>");
+}
 
 static void handleRoot() {
   const Settings &s = settings;
@@ -129,8 +158,17 @@ static void handleRoot() {
          "autocomplete=off placeholder='");
   h += s.proxyToken[0] ? F("Saved - leave blank to keep") : F("Not set");
   h += F("'><p class=hint>PROXY_TOKEN from the Railway service's "
-         "Variables tab.</p>"
-         "<button class=save>Save settings</button></form></body></html>");
+         "Variables tab.</p>");
+
+  h += F("<h2>Over-the-air updates</h2><label>OTA password</label>"
+         "<input type=password name=otaPass maxlength=32 autocomplete=off "
+         "placeholder='");
+  h += s.otaPassword[0] ? F("Saved - leave blank to keep") : F("Not set (OTA off)");
+  h += F("'><p class=hint>Takes effect after a restart.</p>"
+         "<button class=save>Save settings</button></form>");
+
+  appendStatus(h);
+  h += F("</body></html>");
 
   server.send(200, "text/html; charset=utf-8", h);
 }
@@ -172,6 +210,8 @@ static void handleSave() {
   String tok = server.arg("proxyTok");
   tok.trim();
   if (tok.length()) tok.toCharArray(s.proxyToken, sizeof(s.proxyToken));
+  const String ota = server.arg("otaPass");
+  if (ota.length()) ota.toCharArray(s.otaPassword, sizeof(s.otaPassword));
   settingsSave();
   redirectHome();
 }

@@ -32,6 +32,8 @@ void settingsLoad() {
       .toCharArray(settings.proxyUrl, sizeof(settings.proxyUrl));
   prefs.getString("proxyTok", "").toCharArray(settings.proxyToken,
                                               sizeof(settings.proxyToken));
+  prefs.getString("otaPass", "").toCharArray(settings.otaPassword,
+                                             sizeof(settings.otaPassword));
   prefs.end();
 }
 
@@ -54,5 +56,6 @@ void settingsSave() {
   prefs.putString("tflKey", settings.tflKey);
   prefs.putString("proxyUrl", settings.proxyUrl);
   prefs.putString("proxyTok", settings.proxyToken);
+  prefs.putString("otaPass", settings.otaPassword);
   prefs.end();
 }

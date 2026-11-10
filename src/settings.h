@@ -19,6 +19,7 @@ struct Settings {
   char tflKey[64];
   char proxyUrl[96];        // train proxy base URL (Railway)
   char proxyToken[64];      // shared secret sent as X-Board-Token
+  char otaPassword[33];     // empty = over-the-air updates disabled
 };
 
 extern Settings settings;
