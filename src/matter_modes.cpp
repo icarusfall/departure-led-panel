@@ -24,11 +24,24 @@ static void setStore(uint8_t i, bool on) {
   plugs[i].updateAttributeVal(OnOff::Id, OnOff::Attributes::OnOff::Id, &v);
 }
 
+// Set when the active mode was switched off; matterModesLoop() turns it
+// back on shortly afterwards.
+static std::atomic<int> reassert{-1};
+static uint32_t reassertAt = 0;
+static const uint32_t REASSERT_MS = 700;
+
 // Runs in the Matter task, for commands from Google Home and for our own
-// setStore() writes. Turning a mode on turns the others off; switching the
-// active mode off is refused, so one mode is always on.
+// setStore() writes. Turning a mode on turns the others off. Switching the
+// active mode off is accepted (refusing it makes Google Home show "Something
+// went wrong") and then undone, so one mode is always on.
 static bool onChange(uint8_t i, bool on) {
-  if (!on) return (int)i != active.load();
+  if (!on) {
+    if ((int)i == active.load()) {
+      reassertAt = millis();
+      reassert = i;
+    }
+    return true;
+  }
   if ((int)i != active.load()) {
     active = i;
     requested = i;
@@ -62,7 +75,13 @@ void matterModesBegin(uint8_t mode) {
 }
 
 void matterModesLoop() {
-  if (started) matterRestartIfNoFabric();  // removed from Google Home
+  if (!started) return;
+  matterRestartIfNoFabric();  // removed from Google Home
+  const int r = reassert.load();
+  if (r >= 0 && millis() - reassertAt > REASSERT_MS) {
+    reassert = -1;
+    if (r == active.load()) setStore(r, true);
+  }
 }
 
 int matterModesTakeRequest() { return requested.exchange(-1); }
